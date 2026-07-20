@@ -1,0 +1,2203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <title>Roteirizador de Frota - IF Baiano</title>
+
+    <!-- SEO -->
+    <meta name="description" content="Planeje viagens entre os campi do IF Baiano com cálculo de combustível, paradas em postos credenciados Goldi Fleet e navegação GPS integrada.">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#1A3C22">
+
+    <!-- Favicon (logo vertical IF Baiano) -->
+    <link rel="icon" type="image/x-icon"  href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon.png">
+    <link rel="apple-touch-icon"          href="favicon.png">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Roteirizador de Frota - IF Baiano">
+    <meta property="og:description" content="Planejamento logístico de viagens para a frota do Instituto Federal Baiano com postos credenciados Goldi Fleet.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="favicon.png">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* ===================== DESIGN TOKENS ===================== */
+        :root {
+            /* Cores Oficiais do IF Baiano (HSL Calibrados para Harmonia Visual) */
+            --if-verde: #009639;
+            --if-verde-hsl: 143, 100%, 29%;
+            --if-vermelho: #E31B23;
+            --if-vermelho-hsl: 359, 79%, 50%;
+            --if-verde-escuro: #092812;
+            --if-verde-escuro-hsl: 139, 64%, 10%;
+            --if-cinza: #7D7D7D;
+            
+            /* Suportes Cromáticos Premium */
+            --if-verde-suave: hsla(143, 40%, 96%, 1);
+            --if-vermelho-suave: hsla(359, 50%, 97%, 1);
+            --if-fundo: #f3f6f3;
+            --if-card: #ffffff;
+            --if-borda: rgba(9, 40, 18, 0.08);
+            --if-texto: #111a14;
+            --if-texto-mutado: #4e6154;
+            --if-branco: #ffffff;
+            
+            /* Sombras Fina de Alta Resolução */
+            --if-sombra-sutil: 0 4px 20px -2px rgba(9, 40, 18, 0.04), 0 2px 6px -1px rgba(9, 40, 18, 0.02);
+            --if-sombra-elevada: 0 12px 30px -4px rgba(9, 40, 18, 0.08), 0 4px 12px -2px rgba(9, 40, 18, 0.04);
+            
+            /* Bordas e Cantos (Conforme Diretrizes Anti-Slop) */
+            --radius-lg: 12px;
+            --radius-md: 8px;
+            --radius-sm: 6px;
+            
+            /* Transição Premium */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --sidebar-w: 420px;
+        }
+
+        /* ===================== ALTO CONTRASTE ===================== */
+        body.high-contrast {
+            --if-verde: #00FF00;
+            --if-vermelho: #FF3333;
+            --if-verde-escuro: #000000;
+            --if-verde-suave: #000000;
+            --if-vermelho-suave: #000000;
+            --if-fundo: #000000;
+            --if-card: #121212;
+            --if-borda: #ffffff;
+            --if-texto: #ffffff;
+            --if-texto-mutado: #dddddd;
+            --if-sombra-sutil: none;
+            --if-sombra-elevada: none;
+        }
+        body.high-contrast .leaflet-tile-pane { filter: grayscale(1) contrast(1.5) invert(1); }
+        body.high-contrast .section-card,
+        body.high-contrast .posto-item { border: 2px solid #ffffff; }
+        body.high-contrast .btn-primary { border: 2px solid #ffffff; background: #000000; }
+        body.high-contrast .btn-gps { border: 1.5px solid #ffffff; background: #000000; color: #ffffff; }
+
+        /* ===================== RESET E BASE ===================== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html {
+            font-size: 100%;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--if-fundo);
+            color: var(--if-texto);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            min-height: 100dvh;
+            overflow: hidden;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===================== HEADER ===================== */
+        .app-header {
+            background-color: var(--if-verde-escuro);
+            color: var(--if-branco);
+            padding: 0 24px;
+            height: 64px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid var(--if-vermelho);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 1000;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .app-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .header-logo-official {
+            height: 36px;
+            width: auto;
+            max-width: 140px;
+            flex-shrink: 0;
+            display: inline-block;
+            vertical-align: middle;
+            transition: transform 0.3s var(--ease-out-expo);
+        }
+        
+        .header-logo-official:hover {
+            transform: scale(1.03);
+        }
+
+        .header-logo-official.logo-contrast {
+            display: none;
+        }
+
+        body.high-contrast .header-logo-official.logo-normal {
+            display: none !important;
+        }
+
+        body.high-contrast .header-logo-official.logo-contrast {
+            display: inline-block !important;
+        }
+
+        .header-text h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            background: linear-gradient(135deg, #ffffff 60%, #c4e9cf 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-text .subtitle {
+            font-size: 0.68rem;
+            opacity: 0.85;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: #c4e9cf;
+        }
+
+        .a11y-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn-a11y {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--if-branco);
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 600;
+            font-family: inherit;
+            transition: all 0.2s var(--ease-out-expo);
+            line-height: 1;
+        }
+
+        .btn-a11y:hover,
+        .btn-a11y:focus-visible {
+            background: var(--if-vermelho);
+            border-color: var(--if-vermelho);
+            color: var(--if-branco);
+            transform: translateY(-1px);
+        }
+
+        .btn-a11y:active {
+            transform: translateY(0);
+        }
+
+        /* ===================== LAYOUT PRINCIPAL ===================== */
+        .app-body {
+            position: relative;
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            height: calc(100vh - 64px);
+            height: calc(100dvh - 64px);
+        }
+
+        /* ===================== SIDEBAR ===================== */
+        .sidebar {
+            width: var(--sidebar-w);
+            min-width: var(--sidebar-w);
+            height: calc(100vh - 64px);
+            height: calc(100dvh - 64px);
+            max-height: calc(100vh - 64px);
+            max-height: calc(100dvh - 64px);
+            box-sizing: border-box;
+            background-color: var(--if-card);
+            border-right: 1px solid var(--if-borda);
+            overflow-y: auto;
+            padding: 24px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            transition: margin-left 0.35s var(--ease-out-expo), opacity 0.35s var(--ease-out-expo);
+            opacity: 1;
+            z-index: 99;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Barra de rolagem vertical personalizada para a sidebar */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+            display: block !important;
+        }
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(9, 40, 18, 0.12);
+            border-radius: var(--radius-sm);
+        }
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: var(--if-cinza);
+        }
+
+        .sidebar.collapsed {
+            margin-left: calc(-1 * var(--sidebar-w));
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .section-card {
+            background: var(--if-card);
+            border: 1px solid var(--if-borda);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            box-shadow: var(--if-sombra-sutil);
+            transition: padding 0.35s var(--ease-out-expo), box-shadow 0.35s var(--ease-out-expo), border-color 0.3s;
+        }
+
+        .section-card:hover {
+            box-shadow: var(--if-sombra-elevada);
+            border-color: rgba(0, 150, 57, 0.15);
+        }
+
+        .section-header-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            cursor: pointer;
+            margin-bottom: 0 !important;
+            padding-bottom: 2px;
+        }
+
+        .section-card.collapsed {
+            padding-bottom: 12px;
+        }
+
+        .section-content {
+            max-height: 1200px;
+            opacity: 1;
+            overflow: visible;
+            transition: max-height 0.4s var(--ease-out-expo), opacity 0.3s, margin-top 0.3s;
+            margin-top: 16px;
+        }
+
+        .section-card.collapsed .section-content {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            margin-top: 0;
+            pointer-events: none;
+        }
+
+        .btn-slide-vertical {
+            background: rgba(9, 40, 18, 0.04);
+            border: none;
+            color: var(--if-texto-mutado);
+            cursor: pointer;
+            font-size: 0.72rem;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.35s var(--ease-out-expo), background 0.2s, color 0.2s;
+        }
+
+        .btn-slide-vertical:hover {
+            background: rgba(0, 150, 57, 0.1);
+            color: var(--if-verde);
+        }
+
+        .section-card.collapsed .btn-slide-vertical {
+            transform: rotate(180deg);
+        }
+
+        .section-card h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.08rem;
+            font-weight: 700;
+            color: var(--if-verde-escuro);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 0;
+        }
+
+        .section-card h2 .icon {
+            font-size: 1.2rem;
+        }
+
+        /* ===================== FORMULÁRIO ===================== */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--if-texto);
+            letter-spacing: -0.01em;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--if-borda);
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            font-size: 0.85rem;
+            color: var(--if-texto);
+            background-color: var(--if-branco);
+            transition: border-color 0.2s var(--ease-out-expo), box-shadow 0.2s var(--ease-out-expo);
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234e6154' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 36px;
+        }
+
+        .form-control:focus {
+            border-color: var(--if-verde);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 150, 57, 0.08);
+        }
+
+        .btn-primary {
+            width: 100%;
+            background: linear-gradient(135deg, var(--if-verde) 0%, var(--if-verde-escuro) 100%);
+            color: var(--if-branco);
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
+            font-weight: 700;
+            font-size: 0.9rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s var(--ease-out-expo);
+            box-shadow: 0 4px 12px rgba(0, 150, 57, 0.15);
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0, 150, 57, 0.22);
+            filter: brightness(1.08);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            background: #dce3dd;
+            color: var(--if-texto-mutado);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: var(--if-branco);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .btn-primary.loading .spinner { display: inline-block; }
+        .btn-primary.loading .btn-label { display: none; }
+
+        /* ===================== PAINEL DE RESULTADOS (BENTO DESIGN) ===================== */
+        .results-panel {
+            display: none;
+        }
+
+        .results-panel.visible {
+            display: block;
+            animation: slideUp 0.35s var(--ease-out-expo) forwards;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Stats Bento Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            background: hsla(139, 20%, 97%, 1);
+            border: 1px solid rgba(9, 40, 18, 0.05);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.25s var(--ease-out-expo);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: rgba(9, 40, 18, 0.15);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            background: #ffffff;
+            border-color: rgba(0, 150, 57, 0.1);
+            box-shadow: 0 4px 12px rgba(9, 40, 18, 0.03);
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--if-texto-mutado);
+            margin-bottom: 6px;
+        }
+
+        .stat-card .stat-value {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--if-verde-escuro);
+            line-height: 1.1;
+        }
+
+        /* Destacar stat de combustível e paradas */
+        .stat-card.stat-highlight {
+            background: var(--if-verde-suave);
+            border-color: rgba(0, 150, 57, 0.08);
+        }
+
+        .stat-card.stat-highlight::before {
+            background: var(--if-verde);
+        }
+
+        .stat-card.stat-highlight .stat-value {
+            color: var(--if-verde);
+        }
+
+        .stat-card:nth-child(4).stat-highlight::before {
+            background: var(--if-vermelho);
+        }
+
+        .stat-card:nth-child(4).stat-highlight .stat-value {
+            color: var(--if-vermelho);
+        }
+
+        /* Autonomia automotiva de combustível */
+        .fuel-gauge {
+            margin: 18px 0;
+            padding: 14px;
+            background: hsla(139, 20%, 97%, 1);
+            border: 1px solid rgba(9, 40, 18, 0.05);
+            border-radius: var(--radius-md);
+        }
+
+        .fuel-gauge-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--if-texto);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .fuel-gauge-track-container {
+            position: relative;
+            padding: 4px 0;
+        }
+
+        .fuel-gauge-track {
+            width: 100%;
+            height: 8px;
+            background: #e1e7e2;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .fuel-gauge-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.8s cubic-bezier(0.25, 1, 0.5, 1), background 0.3s;
+            background: var(--if-verde);
+        }
+
+        .fuel-gauge-fill.low { background: #E67E22; }
+        .fuel-gauge-fill.critical { background: var(--if-vermelho); }
+
+        .fuel-gauge-ticks {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.6rem;
+            color: var(--if-texto-mutado);
+            font-weight: 700;
+            margin-top: 6px;
+            padding: 0 2px;
+        }
+
+        /* Alert Box */
+        .alert-box {
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            margin-top: 16px;
+            font-size: 0.78rem;
+            line-height: 1.5;
+            display: none;
+            border: 1.5px solid transparent;
+            animation: slideUp 0.3s var(--ease-out-expo) forwards;
+        }
+
+        .alert-box.visible { display: block; }
+
+        .alert-box.alert-ok {
+            background: var(--if-verde-suave);
+            border-color: rgba(0, 150, 57, 0.12);
+            color: #083818;
+        }
+
+        .alert-box.alert-warn {
+            background: #fff8eb;
+            border-color: rgba(230, 126, 34, 0.15);
+            color: #633203;
+        }
+
+        .alert-box.alert-danger {
+            background: var(--if-vermelho-suave);
+            border-color: rgba(227, 27, 35, 0.12);
+            color: #690a0d;
+        }
+
+        /* Navigation Buttons */
+        .nav-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .btn-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 11px 12px;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            font-size: 0.8rem;
+            font-family: inherit;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s var(--ease-out-expo);
+            border: 1px solid var(--if-borda);
+        }
+
+        .btn-nav:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(9, 40, 18, 0.05);
+        }
+
+        .btn-nav:active {
+            transform: translateY(0);
+        }
+
+        .btn-google {
+            background: var(--if-branco);
+            color: var(--if-texto);
+            border-color: var(--if-borda);
+        }
+        .btn-google:hover {
+            background: var(--if-fundo);
+        }
+
+        .btn-waze {
+            background: #33ccff;
+            color: #0b2430;
+            border-color: #33ccff;
+            font-weight: 700;
+        }
+        .btn-waze:hover {
+            background: #23b7e7;
+            border-color: #23b7e7;
+        }
+
+        /* ===================== SEÇÃO DE POSTOS ===================== */
+        .postos-header-info {
+            font-size: 0.72rem;
+            color: var(--if-texto-mutado);
+            margin-bottom: 16px;
+            padding: 12px 14px;
+            background: var(--if-verde-suave);
+            border: 1px dashed rgba(0, 150, 57, 0.2);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .posto-item {
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            background: hsla(139, 20%, 97%, 1);
+            border: 1px solid var(--if-borda);
+            margin-bottom: 10px;
+            position: relative;
+            transition: all 0.2s var(--ease-out-expo);
+        }
+
+        .posto-item.posto-obrigatorio {
+            border-left: 3px solid var(--if-vermelho);
+            background: rgba(227, 27, 35, 0.02);
+        }
+
+        .posto-item:hover {
+            background: #ffffff;
+            border-color: rgba(0, 150, 57, 0.2);
+            box-shadow: 0 4px 12px rgba(9, 40, 18, 0.04);
+            transform: scale(1.005);
+        }
+
+        .posto-item.posto-obrigatorio:hover {
+            background: rgba(227, 27, 35, 0.04);
+            border-left-color: var(--if-vermelho);
+        }
+
+        .posto-item h4 {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--if-verde-escuro);
+            margin-bottom: 6px;
+            padding-right: 75px;
+            line-height: 1.3;
+        }
+
+        .posto-item .posto-meta {
+            font-size: 0.68rem;
+            color: var(--if-texto-mutado);
+            font-weight: 500;
+        }
+
+        .stop-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--if-vermelho);
+            color: var(--if-branco);
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-size: 0.58rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .stop-badge.alternative {
+            background: var(--if-verde);
+        }
+
+        /* Botões GPS dos postos listados */
+        .posto-item-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-gps {
+            flex: 1;
+            min-width: 72px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 6px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all 0.2s var(--ease-out-expo);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border: 1px solid var(--if-borda);
+        }
+
+        .btn-gps-google {
+            background-color: var(--if-branco);
+            color: var(--if-verde);
+        }
+
+        .btn-gps-google:hover {
+            background-color: var(--if-verde);
+            color: var(--if-branco);
+            border-color: var(--if-verde);
+        }
+
+        .btn-gps-waze {
+            background-color: var(--if-branco);
+            color: #007bb6;
+        }
+
+        .btn-gps-waze:hover {
+            background-color: #33ccff;
+            color: #0d2430;
+            border-color: #33ccff;
+        }
+
+        .btn-gps-apple {
+            background-color: var(--if-branco);
+            color: #333;
+        }
+
+        .btn-gps-apple:hover {
+            background-color: #1c1c1e;
+            color: #fff;
+            border-color: #1c1c1e;
+        }
+
+        /* Popup de clique no mapa (localização personalizada) */
+        .map-click-popup .leaflet-popup-content-wrapper {
+            border-radius: 10px;
+            box-shadow: var(--if-sombra-elevada);
+            border: 1px solid var(--if-borda);
+        }
+        .map-click-popup-inner {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.8rem;
+            padding: 2px;
+        }
+        .map-click-popup-inner .popup-title {
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--if-verde-escuro);
+            margin-bottom: 4px;
+        }
+        .map-click-popup-inner .popup-coords {
+            font-size: 0.65rem;
+            color: var(--if-texto-mutado);
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+        .popup-nav-row {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+        }
+        .popup-nav-btn {
+            flex: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all 0.2s var(--ease-out-expo);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            cursor: pointer;
+            border: 1px solid var(--if-borda);
+        }
+        .popup-nav-btn.google {
+            background: #ffffff;
+            color: #009639;
+        }
+        .popup-nav-btn.google:hover {
+            background: #009639;
+            color: #ffffff;
+            border-color: #009639;
+        }
+        .popup-nav-btn.waze {
+            background: #ffffff;
+            color: #007bb6;
+        }
+        .popup-nav-btn.waze:hover {
+            background: #33ccff;
+            color: #0a1a23;
+            border-color: #33ccff;
+        }
+        .popup-nav-btn.apple {
+            background: #ffffff;
+            color: #333;
+        }
+        .popup-nav-btn.apple:hover {
+            background: #1c1c1e;
+            color: #ffffff;
+            border-color: #1c1c1e;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 24px;
+            color: var(--if-texto-mutado);
+            font-size: 0.78rem;
+            font-weight: 500;
+        }
+
+        .empty-state .empty-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        /* ===================== MAPA ===================== */
+        .map-panel {
+            position: relative;
+            overflow: hidden;
+            flex: 1;
+            height: calc(100vh - 64px);
+            height: calc(100dvh - 64px);
+            max-height: calc(100vh - 64px);
+            max-height: calc(100dvh - 64px);
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            min-height: 100%;
+        }
+
+        /* Customizar Leaflet Controls para aparência premium */
+        .leaflet-bar {
+            box-shadow: var(--if-sombra-elevada) !important;
+            border: 1px solid var(--if-borda) !important;
+            border-radius: var(--radius-md) !important;
+            overflow: hidden;
+        }
+        .leaflet-bar a {
+            background-color: var(--if-card) !important;
+            color: var(--if-texto) !important;
+            border-bottom: 1px solid var(--if-borda) !important;
+            transition: background-color 0.2s;
+        }
+        .leaflet-bar a:hover {
+            background-color: var(--if-verde-suave) !important;
+            color: var(--if-verde) !important;
+        }
+
+        /* Botão para Recolher/Expandir a Sidebar */
+        .btn-toggle-sidebar {
+            position: absolute;
+            left: calc(var(--sidebar-w) - 15px);
+            top: 20px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--if-card);
+            border: 1px solid var(--if-borda);
+            color: var(--if-texto);
+            box-shadow: var(--if-sombra-elevada);
+            cursor: pointer;
+            z-index: 1010;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.35s var(--ease-out-expo);
+        }
+
+        .btn-toggle-sidebar:hover {
+            background: var(--if-verde-suave);
+            border-color: var(--if-verde);
+            color: var(--if-verde);
+            transform: scale(1.05);
+        }
+
+        .btn-toggle-sidebar:focus-visible {
+            outline: 2px solid var(--if-verde);
+            outline-offset: 2px;
+        }
+
+        .sidebar.collapsed + .btn-toggle-sidebar {
+            left: 15px;
+        }
+
+        .sidebar.collapsed + .btn-toggle-sidebar .arrow {
+            transform: rotate(180deg);
+        }
+
+        /* Esconder botão toggle no mobile */
+        @media (max-width: 900px) {
+            .btn-toggle-sidebar {
+                display: none !important;
+            }
+        }
+
+        /* Medidor de Combustível Interativo de Painel (Sleek Dashboard Visual) */
+        .interactive-fuel-container {
+            background: hsla(139, 20%, 97%, 1);
+            border: 1px solid var(--if-borda);
+            border-radius: var(--radius-md);
+            padding: 16px 12px;
+            text-align: center;
+            margin-bottom: 8px;
+            user-select: none;
+            box-shadow: inset 0 2px 6px rgba(9, 40, 18, 0.02);
+            transition: background 0.3s;
+        }
+
+        .interactive-fuel-container:hover {
+            background: #ffffff;
+            border-color: rgba(0, 150, 57, 0.12);
+        }
+
+        .dashboard-dial-wrapper {
+            width: 160px;
+            margin: 0 auto;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .dial-svg {
+            width: 100%;
+            height: auto;
+            overflow: visible;
+        }
+
+        .dial-labels-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 2px;
+            margin-top: 8px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--if-texto-mutado);
+        }
+
+        .dial-label-btn {
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s var(--ease-out-expo);
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .dial-label-btn:hover {
+            color: var(--if-texto);
+            background: rgba(9, 40, 18, 0.05);
+        }
+
+        body.high-contrast .dial-label-btn:hover {
+            background: var(--if-texto);
+            color: var(--if-card);
+        }
+
+        .dial-label-btn.active {
+            color: var(--if-branco);
+            background: var(--if-verde);
+            box-shadow: 0 2px 6px rgba(0, 150, 57, 0.2);
+        }
+
+        .dial-label-btn[data-value="0.0"].active {
+            background: var(--if-vermelho) !important;
+            box-shadow: 0 2px 6px rgba(227, 27, 35, 0.2);
+        }
+
+        .dial-status-text {
+            margin-top: 10px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--if-texto);
+            letter-spacing: -0.01em;
+        }
+
+        .dial-status-text.warning {
+            color: var(--if-vermelho);
+            animation: pulse-warn 1.5s infinite;
+        }
+
+        @keyframes pulse-warn {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Legenda flutuante no mapa */
+        .map-legend {
+            position: absolute;
+            bottom: 24px;
+            left: 12px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: var(--radius-lg);
+            padding: 14px 16px;
+            font-size: 0.7rem;
+            box-shadow: var(--if-sombra-elevada);
+            z-index: 800;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            border: 1px solid var(--if-borda);
+            font-weight: 600;
+        }
+
+        .map-legend .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            border: 2.5px solid var(--if-branco);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+        }
+
+        /* Pulsante animação do Pin SVG (Origem/Destino) */
+        @keyframes pulse {
+            0% { transform: scale(0.65); opacity: 0.8; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+
+        /* ===================== MOBILE: TABS + SHEET ===================== */
+        .mobile-tabs {
+            display: none;
+        }
+
+        @media (max-width: 900px) {
+            .app-header {
+                padding: 0 16px;
+                height: 56px;
+            }
+
+            .header-text h1 {
+                font-size: 1.02rem;
+            }
+
+            .header-text .subtitle {
+                display: none;
+            }
+
+            .app-body {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr;
+                height: calc(100vh - 56px);
+                height: calc(100dvh - 56px);
+                position: relative;
+            }
+
+            .map-panel {
+                grid-row: 1;
+                width: 100%;
+                height: 100%;
+            }
+
+            /* Sidebar bottom sheet */
+            .sidebar {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 900;
+                max-height: 75vh;
+                max-height: 75dvh;
+                border-right: none;
+                border-top: 1px solid var(--if-borda);
+                border-radius: 16px 16px 0 0;
+                box-shadow: 0 -8px 30px rgba(9,40,18,0.15);
+                padding: 12px 16px 24px;
+                transform: translateY(calc(100% - 56px));
+                transition: transform 0.4s var(--ease-out-expo);
+                will-change: transform;
+                background-color: var(--if-card);
+            }
+
+            .sidebar.expanded {
+                transform: translateY(0);
+                overflow-y: auto;
+            }
+
+            /* Alça de arrastar */
+            .sheet-handle {
+                display: flex;
+                justify-content: center;
+                padding: 6px 0 12px;
+                cursor: pointer;
+            }
+
+            .sheet-handle-bar {
+                width: 40px;
+                height: 4px;
+                background: var(--if-borda);
+                border-radius: 4px;
+            }
+
+            .mobile-tabs {
+                display: flex;
+                gap: 6px;
+                margin-bottom: 16px;
+            }
+
+            .mobile-tab {
+                flex: 1;
+                padding: 10px;
+                border: 1px solid var(--if-borda);
+                border-radius: var(--radius-sm);
+                background: var(--if-branco);
+                font-family: inherit;
+                font-size: 0.75rem;
+                font-weight: 700;
+                color: var(--if-texto-mutado);
+                cursor: pointer;
+                transition: all 0.2s var(--ease-out-expo);
+                text-align: center;
+            }
+
+            .mobile-tab.active {
+                background: var(--if-verde-escuro);
+                color: var(--if-branco);
+                border-color: var(--if-verde-escuro);
+                box-shadow: 0 2px 6px rgba(9, 40, 18, 0.1);
+            }
+
+            .sidebar .section-card {
+                display: none;
+            }
+
+            .sidebar .section-card.mobile-visible {
+                display: block;
+            }
+
+            .map-legend {
+                bottom: 70px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .a11y-toolbar { gap: 6px; }
+            .btn-a11y { padding: 5px 8px; font-size: 0.72rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ===================== PRINT ===================== */
+        @media print {
+            .app-header, .a11y-toolbar, .btn-primary, .nav-actions, .map-panel { display: none; }
+            .app-body { display: block; height: auto; overflow: visible; }
+            .sidebar { border: none; box-shadow: none; padding: 0; overflow: visible; position: static; transform: none; max-height: none; }
+            .section-card { break-inside: avoid; box-shadow: none; }
+        }
+
+        /* ===================== FOCUS VISIBLE ===================== */
+        :focus-visible {
+            outline: 2px solid var(--if-verde);
+            outline-offset: 2px;
+        }
+
+        .sheet-handle { display: none; }
+        @media (max-width: 900px) {
+            .sheet-handle { display: flex; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ============ HEADER ============ -->
+    <header class="app-header" role="banner">
+        <div class="header-brand">
+            <img src="marca-if-baiano-horizontal-branca.png" alt="Logotipo IF Baiano" class="header-logo-official logo-normal">
+            <img src="marca-if-baiano-horizontal.png" alt="Logotipo IF Baiano" class="header-logo-official logo-contrast">
+            <div class="header-text" style="margin-left: 8px;">
+                <h1>Roteirizador de Frota</h1>
+                <span class="subtitle">Instituto Federal Baiano</span>
+            </div>
+        </div>
+        <nav class="a11y-toolbar" aria-label="Controles de Acessibilidade">
+            <button class="btn-a11y" id="btn-font-minus" aria-label="Diminuir tamanho da fonte">A−</button>
+            <button class="btn-a11y" id="btn-font-plus" aria-label="Aumentar tamanho da fonte">A+</button>
+            <button class="btn-a11y" id="btn-contrast" aria-label="Alternar modo de alto contraste">👁 Contraste</button>
+        </nav>
+    </header>
+
+    <!-- ============ CORPO ============ -->
+    <div class="app-body">
+
+        <!-- SIDEBAR / BOTTOM SHEET -->
+        <aside class="sidebar" id="sidebar" role="complementary" aria-label="Painel de configuração da viagem">
+
+            <!-- Alça mobile -->
+            <div class="sheet-handle" id="sheetHandle" aria-label="Arrastar painel">
+                <div class="sheet-handle-bar"></div>
+            </div>
+
+            <!-- Tabs mobile -->
+            <div class="mobile-tabs" role="tablist" aria-label="Seções do painel">
+                <button class="mobile-tab active" role="tab" data-tab="form" aria-selected="true">Viagem</button>
+                <button class="mobile-tab" role="tab" data-tab="results" aria-selected="false">Resumo</button>
+                <button class="mobile-tab" role="tab" data-tab="postos" aria-selected="false">Postos</button>
+            </div>
+
+            <!-- FORMULÁRIO -->
+            <div class="section-card mobile-visible" id="card-form" data-section="form">
+                <h2 class="section-header-toggle" onclick="toggleSection('card-form')" aria-expanded="true" aria-controls="content-form">
+                    <span><span class="icon">🚗</span> Dados da Viagem</span>
+                    <button type="button" class="btn-slide-vertical" aria-label="Recolher seção">▲</button>
+                </h2>
+                <div class="section-content" id="content-form">
+                    <form id="routeForm" novalidate>
+                        <div class="form-group">
+                            <label for="origem">Origem (Campus)</label>
+                            <select id="origem" class="form-control" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="destino">Destino (Campus)</label>
+                            <select id="destino" class="form-control" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="veiculo">Veículo da Frota</label>
+                            <select id="veiculo" class="form-control">
+                                <option value="gol" data-consumo="12" data-tanque="45" selected>VW Gol 1.0 — 12 km/L | 45 L</option>
+                                <option value="hb20" data-consumo="11.5" data-tanque="50">HB20 1.0 Auto (Gasolina) — 11.5 km/L | 50 L</option>
+                                <option value="toro-flex" data-consumo="9.5" data-tanque="60">Fiat Toro Ranch (Gasolina) — 9.5 km/L | 60 L</option>
+                                <option value="toro-diesel" data-consumo="12.5" data-tanque="60">Fiat Toro Ranch (Diesel) — 12.5 km/L | 60 L</option>
+                                <option value="saveiro" data-consumo="10" data-tanque="55">VW Saveiro — 10 km/L | 55 L</option>
+                                <option value="l200" data-consumo="9" data-tanque="75">Mitsubishi L200 — 9 km/L | 75 L</option>
+                                <option value="van" data-consumo="8" data-tanque="70">Van de Passageiros — 8 km/L | 70 L</option>
+                                <option value="onibus" data-consumo="4" data-tanque="200">Ônibus de Viagem — 4 km/L | 200 L</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Nível Inicial do Tanque (Interativo)</label>
+                            <input type="hidden" id="nivel-combustivel" value="1.0">
+                            <div class="interactive-fuel-container">
+                                <div class="dashboard-dial-wrapper" id="fuel-dial-wrapper">
+                                    <svg viewBox="0 0 200 120" class="dial-svg" id="interactive-dial-svg" role="img" aria-label="Marcador interativo de combustível. Clique no arco para ajustar.">
+                                        <defs>
+                                            <linearGradient id="dial-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                <stop offset="0%" stop-color="#009639" /> <!-- Verde (100% / Cheio na esquerda) -->
+                                                <stop offset="45%" stop-color="#FFC107" /> <!-- Amarelo -->
+                                                <stop offset="85%" stop-color="#E31B23" /> <!-- Vermelho (0% / Reserva na direita) -->
+                                                <stop offset="100%" stop-color="#E31B23" />
+                                            </linearGradient>
+                                        </defs>
+                                        <!-- Arco de fundo neutro -->
+                                        <path d="M 25,100 A 75,75 0 0,1 175,100" fill="none" stroke="var(--if-borda)" stroke-width="12" stroke-linecap="round"/>
+                                        <!-- Arco colorido com gradiente -->
+                                        <path d="M 25,100 A 75,75 0 0,1 175,100" fill="none" stroke="url(#dial-gradient)" stroke-width="10" stroke-linecap="round"/>
+                                        
+                                        <!-- Centro do dial -->
+                                        <circle cx="100" cy="100" r="10" fill="var(--if-texto-escuro)"/>
+                                        
+                                        <!-- Agulha (Ponteiro) - Inicialmente apontando para 100% (-90deg de rotação na esquerda) -->
+                                        <line id="dial-needle" x1="100" y1="100" x2="100" y2="35" stroke="#E31B23" stroke-width="3" stroke-linecap="round" style="transform-origin: 100px 100px; transform: rotate(-90deg); transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);"/>
+                                        <circle cx="100" cy="100" r="5" fill="#E31B23"/>
+                                    </svg>
+                                </div>
+                                <div class="dial-labels-container" id="dial-labels">
+                                    <span class="dial-label-btn active" data-value="1.0">C</span>
+                                    <span class="dial-label-btn" data-value="0.9">90</span>
+                                    <span class="dial-label-btn" data-value="0.8">80</span>
+                                    <span class="dial-label-btn" data-value="0.7">70</span>
+                                    <span class="dial-label-btn" data-value="0.6">60</span>
+                                    <span class="dial-label-btn" data-value="0.5">1/2</span>
+                                    <span class="dial-label-btn" data-value="0.4">40</span>
+                                    <span class="dial-label-btn" data-value="0.3">30</span>
+                                    <span class="dial-label-btn" data-value="0.2">20</span>
+                                    <span class="dial-label-btn" data-value="0.1">10</span>
+                                    <span class="dial-label-btn" data-value="0.0">R</span>
+                                </div>
+                                <div class="dial-status-text" id="dial-status-text">Nível: 100% (Cheio)</div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary" id="btnSubmit">
+                            <span class="spinner" aria-hidden="true"></span>
+                            <span class="btn-label">Calcular Rota</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- RESULTADOS -->
+            <div class="section-card results-panel" id="card-results" data-section="results">
+                <h2 class="section-header-toggle" onclick="toggleSection('card-results')" aria-expanded="true" aria-controls="content-results">
+                    <span><span class="icon">📊</span> Resumo Logístico</span>
+                    <button type="button" class="btn-slide-vertical" aria-label="Recolher seção">▲</button>
+                </h2>
+                <div class="section-content" id="content-results">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Distância</div>
+                            <div class="stat-value" id="stat-dist">—</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Tempo</div>
+                            <div class="stat-value" id="stat-time">—</div>
+                        </div>
+                        <div class="stat-card stat-highlight">
+                            <div class="stat-label">Combustível</div>
+                            <div class="stat-value" id="stat-fuel">—</div>
+                        </div>
+                        <div class="stat-card stat-highlight">
+                            <div class="stat-label">Paradas</div>
+                            <div class="stat-value" id="stat-stops">—</div>
+                        </div>
+                    </div>
+
+                    <!-- Gauge -->
+                    <div class="fuel-gauge">
+                        <div class="fuel-gauge-label">
+                            <span>Autonomia estimada</span>
+                            <span id="gauge-km">—</span>
+                        </div>
+                        <div class="fuel-gauge-track-container">
+                            <div class="fuel-gauge-track">
+                                <div class="fuel-gauge-fill" id="gauge-fill" style="width: 0%;"></div>
+                            </div>
+                            <div class="fuel-gauge-ticks" aria-hidden="true">
+                                <span>R (Vazio)</span>
+                                <span>1/2</span>
+                                <span>C (Cheio)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Alerta -->
+                    <div class="alert-box" id="alert-box" role="alert"></div>
+
+                    <!-- Botões de Navegação GPS -->
+                    <div class="nav-actions">
+                        <a id="link-google" href="#" target="_blank" rel="noopener" class="btn-nav btn-google" aria-label="Abrir rota no Google Maps">
+                            🗺️ Google Maps
+                        </a>
+                        <a id="link-waze" href="#" target="_blank" rel="noopener" class="btn-nav btn-waze" aria-label="Abrir navegação no Waze">
+                            🧭 Waze
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- POSTOS -->
+            <div class="section-card results-panel" id="card-postos" data-section="postos">
+                <h2 class="section-header-toggle" onclick="toggleSection('card-postos')" aria-expanded="true" aria-controls="content-postos">
+                    <span><span class="icon">⛽</span> Paradas Recomendadas</span>
+                    <button type="button" class="btn-slide-vertical" aria-label="Recolher seção">▲</button>
+                </h2>
+                <div class="section-content" id="content-postos">
+                    <div class="postos-header-info">
+                        Cartão aceito: <strong>Goldi Fleet</strong> · Reserva obrigatória: 1/4 do tanque
+                    </div>
+                    <div id="postos-list">
+                        <div class="empty-state">
+                            <span class="empty-icon">🛣️</span>
+                            Calcule uma rota para ver as paradas sugeridas.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Botão para Recolher/Expandir a Sidebar -->
+        <button id="btn-toggle-sidebar" class="btn-toggle-sidebar" aria-label="Recolher painel lateral">
+            <span class="arrow">◀</span>
+        </button>
+
+        <!-- MAPA -->
+        <main class="map-panel" role="main" aria-label="Mapa de rotas">
+            <div id="map"></div>
+            <div class="map-legend" aria-label="Legenda do mapa">
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--if-vermelho);"></div>
+                    <span>Parada obrigatória</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--if-verde);"></div>
+                    <span>Posto alternativo na rota</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #FFC107;"></div>
+                    <span>Rede Goldi Fleet</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--verde-if); border: 2px solid var(--verde-escuro);"></div>
+                    <span>Trajeto por rodovia</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <script>
+    (function() {
+        'use strict';
+
+        // ===================== ESTADO =====================
+        let map, routeLayer;
+        let markers = [];
+        let dataCampi = [];
+        let dataPostos = [];
+        let currentFontSize = 100;
+
+        // Base de dados embutida (evita erros de CORS ao rodar via file:// localmente)
+        const dadosLocaisDefault = {
+            "campi": [
+                {"nome": "Reitoria - Salvador", "lat": -12.9735, "lng": -38.4418},
+                {"nome": "Campus Alagoinhas", "lat": -12.1384, "lng": -38.4168},
+                {"nome": "Campus Bom Jesus da Lapa", "lat": -13.2629, "lng": -43.5470},
+                {"nome": "Campus Catu", "lat": -12.3508, "lng": -38.3784},
+                {"nome": "Campus Governador Mangabeira", "lat": -12.5638, "lng": -39.0284},
+                {"nome": "Campus Guanambi", "lat": -14.2238, "lng": -42.7844},
+                {"nome": "Campus Itaberaba", "lat": -12.5278, "lng": -40.3068},
+                {"nome": "Campus Itapetinga", "lat": -15.2494, "lng": -40.2484},
+                {"nome": "Campus Santa Inês", "lat": -13.2985, "lng": -39.7226},
+                {"nome": "Campus Senhor do Bonfim", "lat": -10.4578, "lng": -40.1878},
+                {"nome": "Campus Serrinha", "lat": -11.6695, "lng": -39.0116},
+                {"nome": "Campus Teixeira de Freitas", "lat": -17.5459, "lng": -39.7239},
+                {"nome": "Campus Uruçuca", "lat": -14.5933, "lng": -39.2800},
+                {"nome": "Campus Valença", "lat": -13.3735, "lng": -39.0834},
+                {"nome": "Campus Xique-Xique", "lat": -9.5261, "lng": -43.6041},
+                {"nome": "Campus Santo Estêvão", "lat": -12.4303, "lng": -39.2514},
+                {"nome": "Campus Remanso", "lat": -9.6200, "lng": -42.0800},
+                {"nome": "Campus Ruy Barbosa", "lat": -12.2837, "lng": -40.4897},
+                {"nome": "Campus Ribeira do Pombal", "lat": -10.8344, "lng": -38.5358}
+            ],
+            "postos": [
+                {"nome": "Posto Petrobras Parada Obrigatória - Amélia Rodrigues (BR-324 Km 56)", "lat": -12.4354, "lng": -38.7562, "rodovia": "BR-324"},
+                {"nome": "Posto Petrobras Portal do Sertão - Feira de Santana (BR-324 Km 98)", "lat": -12.2680, "lng": -38.9240, "rodovia": "BR-324 / BR-116"},
+                {"nome": "Posto Ipiranga Roda Viva - Itaberaba (BR-242 Km 95)", "lat": -12.5230, "lng": -40.3020, "rodovia": "BR-242"},
+                {"nome": "Posto Petrobras BR Chapada - Lapa/Lençóis (BR-242 Km 225)", "lat": -12.5605, "lng": -41.3910, "rodovia": "BR-242"},
+                {"nome": "Posto Shell Seabra - Seabra (BR-242 Km 360)", "lat": -12.4210, "lng": -41.7740, "rodovia": "BR-242"},
+                {"nome": "Posto Petrobras Ibotirama - Ibotirama (BR-242 Km 570)", "lat": -12.1890, "lng": -43.2210, "rodovia": "BR-242"},
+                {"nome": "Posto Ipiranga Barreiras - Barreiras (BR-242 Km 770)", "lat": -12.1462, "lng": -44.9925, "rodovia": "BR-242"},
+                {"nome": "Posto Petrobras LEM - Luís Eduardo Magalhães (BR-242 Km 860)", "lat": -12.0934, "lng": -45.7986, "rodovia": "BR-242 / BR-020"},
+                {"nome": "Posto Shell Posse - Posse GO (BR-020 Km 1120)", "lat": -14.0938, "lng": -46.3685, "rodovia": "BR-020"},
+                {"nome": "Posto Ipiranga Formosa - Formosa GO (BR-020 Km 1360)", "lat": -15.5410, "lng": -47.3360, "rodovia": "BR-020"},
+                {"nome": "Posto Shell Sobradinho - Sobradinho DF (BR-020 Km 1420)", "lat": -15.6510, "lng": -47.7890, "rodovia": "BR-020"},
+                // Outros postos das rotas do IF Baiano (só para complementar o mapa)
+                {"nome": "Posto Ipiranga Humildes (BR-101)", "lat": -12.3556, "lng": -38.8922, "rodovia": "BR-101"},
+                {"nome": "Posto Shell Alagoinhas (BR-101)", "lat": -12.1450, "lng": -38.4230, "rodovia": "BR-101"},
+                {"nome": "Posto Ipiranga Santo Antônio de Jesus (BR-101)", "lat": -12.9788, "lng": -39.2564, "rodovia": "BR-101"},
+                {"nome": "Posto Petrobras Valença (BA-001)", "lat": -13.3680, "lng": -39.0780, "rodovia": "BA-001"},
+                {"nome": "Posto Shell Milagres (BR-116)", "lat": -12.8756, "lng": -39.8656, "rodovia": "BR-116"},
+                {"nome": "Posto Ipiranga Jequié (BR-116)", "lat": -13.8640, "lng": -40.0840, "rodovia": "BR-116"},
+                {"nome": "Posto Petrobras Vitória da Conquista (BR-116)", "lat": -14.8620, "lng": -40.8380, "rodovia": "BR-116"},
+                {"nome": "Posto Shell Senhor do Bonfim (BR-407)", "lat": -10.4550, "lng": -40.1850, "rodovia": "BR-407"},
+                {"nome": "Posto Ipiranga Juazeiro (BR-407)", "lat": -9.4210, "lng": -40.4980, "rodovia": "BR-407"},
+                {"nome": "Posto Petrobras Serrinha (BR-116 Norte)", "lat": -11.6680, "lng": -38.9950, "rodovia": "BR-116"}
+            ]
+        };
+
+        // ===================== ACESSIBILIDADE =====================
+        document.getElementById('btn-font-minus').addEventListener('click', () => adjustFont(-1));
+        document.getElementById('btn-font-plus').addEventListener('click',  () => adjustFont(1));
+        document.getElementById('btn-contrast').addEventListener('click',   toggleContrast);
+
+        function adjustFont(dir) {
+            currentFontSize = Math.max(80, Math.min(160, currentFontSize + dir * 10));
+            document.documentElement.style.fontSize = currentFontSize + '%';
+        }
+
+        function toggleContrast() {
+            document.body.classList.toggle('high-contrast');
+        }
+
+        // ===================== MOBILE: BOTTOM SHEET =====================
+        const sidebar = document.getElementById('sidebar');
+        const sheetHandle = document.getElementById('sheetHandle');
+
+        sheetHandle.addEventListener('click', () => {
+            sidebar.classList.toggle('expanded');
+        });
+
+        // Tabs
+        document.querySelectorAll('.mobile-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const target = tab.dataset.tab;
+
+                document.querySelectorAll('.mobile-tab').forEach(t => {
+                    t.classList.remove('active');
+                    t.setAttribute('aria-selected', 'false');
+                });
+                tab.classList.add('active');
+                tab.setAttribute('aria-selected', 'true');
+
+                document.querySelectorAll('.sidebar .section-card').forEach(card => {
+                    card.classList.remove('mobile-visible');
+                });
+
+                const sectionMap = {
+                    'form':    'card-form',
+                    'results': 'card-results',
+                    'postos':  'card-postos'
+                };
+
+                const cardEl = document.getElementById(sectionMap[target]);
+                if (cardEl) cardEl.classList.add('mobile-visible');
+            });
+        });
+
+        // ===================== MAPA =====================
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: true,
+                attributionControl: true
+            }).setView([-12.8, -40.5], 7);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            }).addTo(map);
+
+            // ===== CLIQUE LIVRE NO MAPA =====
+            // Exibe popup com opções de navegação GPS para qualquer ponto clicado no mapa
+            map.on('click', function(e) {
+                const lat = e.latlng.lat.toFixed(6);
+                const lng = e.latlng.lng.toFixed(6);
+
+                const selOrigem = document.getElementById('origem');
+                const idxO = selOrigem ? selOrigem.value : null;
+                const origem = (dataCampi && idxO !== null && idxO !== '') ? dataCampi[idxO] : null;
+
+                const googleUrl = origem
+                    ? `https://www.google.com/maps/dir/?api=1&origin=${origem.lat},${origem.lng}&destination=${lat},${lng}&travelmode=driving`
+                    : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+                const wazeUrl   = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+                const appleUrl  = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+
+                const popupHtml = `
+                    <div class="map-click-popup-inner">
+                        <div class="popup-title">📍 Ponto selecionado</div>
+                        <div class="popup-coords">${lat}, ${lng}</div>
+                        <div class="popup-nav-row">
+                            <a href="${googleUrl}" target="_blank" rel="noopener" class="popup-nav-btn google">🗺️ Maps</a>
+                            <a href="${wazeUrl}"   target="_blank" rel="noopener" class="popup-nav-btn waze">🧭 Waze</a>
+                            <a href="${appleUrl}"  target="_blank" rel="noopener" class="popup-nav-btn apple">🍎 Apple</a>
+                        </div>
+                    </div>
+                `;
+
+                L.popup({ className: 'map-click-popup', maxWidth: 260 })
+                    .setLatLng(e.latlng)
+                    .setContent(popupHtml)
+                    .openOn(map);
+            });
+        }
+
+        // ===================== HAVERSINE =====================
+        function haversineKm(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        // Encontra ponto mais perto da rota e retorna a distância cumulativa
+        function mapPostoToRoute(posto, coords, cumDists) {
+            let minDist = Infinity;
+            let bestIdx = 0;
+            for (let i = 0; i < coords.length; i++) {
+                const d = haversineKm(posto.lat, posto.lng, coords[i][1], coords[i][0]);
+                if (d < minDist) { minDist = d; bestIdx = i; }
+            }
+            return { distAoTrajeto: minDist, kmNaRota: cumDists[bestIdx] };
+        }
+
+        // ===================== HELPER GPS PARA POPUPS DO MAPA =====================
+        function obterLinksGPSPosto(p) {
+            const selOrigem = document.getElementById('origem');
+            const idxO = selOrigem ? selOrigem.value : null;
+            const origem = (dataCampi && idxO !== null && idxO !== "") ? dataCampi[idxO] : null;
+            
+            const googleUrl = (origem && origem.lat && origem.lng) ? 
+                `https://www.google.com/maps/dir/?api=1&origin=${origem.lat},${origem.lng}&destination=${p.lat},${p.lng}&travelmode=driving` :
+                `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=driving`;
+                
+            const wazeUrl  = `https://waze.com/ul?ll=${p.lat},${p.lng}&navigate=yes`;
+            const appleUrl = `https://maps.apple.com/?daddr=${p.lat},${p.lng}&dirflg=d`;
+            
+            return { googleUrl, wazeUrl, appleUrl };
+        }
+
+        function obterBotoesGpsPopup(p) {
+            const links = obterLinksGPSPosto(p);
+            return `
+                <div class="popup-nav-row" style="margin-top: 10px;">
+                    <a href="${links.googleUrl}" target="_blank" rel="noopener" class="popup-nav-btn google">🗺️ Maps</a>
+                    <a href="${links.wazeUrl}"   target="_blank" rel="noopener" class="popup-nav-btn waze">🧭 Waze</a>
+                    <a href="${links.appleUrl}"  target="_blank" rel="noopener" class="popup-nav-btn apple">🍎 Apple</a>
+                </div>
+            `;
+        }
+
+        // ===================== CARREGAR DADOS =====================
+        async function loadData() {
+            try {
+                // Tenta carregar dados do arquivo JSON externo (caso hospedado num servidor web)
+                const res = await fetch('postos.json');
+                const data = await res.json();
+                dataCampi = data.campi;
+                dataPostos = data.postos;
+            } catch (err) {
+                // Fallback imediato se falhar (ex: rodando localmente via file://)
+                console.warn('Rodando localmente ou erro de CORS. Utilizando base de dados embutida.');
+                dataCampi = dadosLocaisDefault.campi;
+                dataPostos = dadosLocaisDefault.postos;
+            }
+
+            const selOrigem  = document.getElementById('origem');
+            const selDestino = document.getElementById('destino');
+
+            selOrigem.innerHTML = '';
+            selDestino.innerHTML = '';
+
+            dataCampi.forEach((c, i) => {
+                selOrigem.appendChild(new Option(c.nome, i));
+                const opt = new Option(c.nome, i);
+                if (c.nome.includes('Senhor do Bonfim')) opt.selected = true;
+                selDestino.appendChild(opt);
+            });
+
+            // Plota todos os postos com opacidade suave no mapa, incluindo botões de GPS
+            dataPostos.forEach(p => {
+                L.circleMarker([p.lat, p.lng], {
+                    radius: 5, fillColor: '#FFC107', color: '#7A6B3E',
+                    weight: 1, opacity: 0.4, fillOpacity: 0.3
+                }).addTo(map).bindPopup(() => {
+                    const gpsHtml = obterBotoesGpsPopup(p);
+                    return `<strong>${p.nome}</strong><br>${p.rodovia}<br><em>Rede Goldi Fleet</em>${gpsHtml}`;
+                });
+            });
+        }
+
+
+        // ===================== LIMPAR ROTA ANTERIOR =====================
+        function limparRota() {
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+        }
+
+        // ===================== CALCULAR ROTA =====================
+        async function calcularRota(e) {
+            e.preventDefault();
+
+            const btnSubmit = document.getElementById('btnSubmit');
+            btnSubmit.classList.add('loading');
+            btnSubmit.disabled = true;
+
+            const idxO = document.getElementById('origem').value;
+            const idxD = document.getElementById('destino').value;
+
+            if (idxO === idxD) {
+                showToast('Origem e destino devem ser diferentes.');
+                btnSubmit.classList.remove('loading');
+                btnSubmit.disabled = false;
+                return;
+            }
+
+            const vOpt = document.getElementById('veiculo').selectedOptions[0];
+            const consumo = parseFloat(vOpt.dataset.consumo);
+            const tanque  = parseFloat(vOpt.dataset.tanque);
+            const nivel   = parseFloat(document.getElementById('nivel-combustivel').value);
+
+            const origem  = dataCampi[idxO];
+            const destino = dataCampi[idxD];
+
+            limparRota();
+
+            try {
+                const url = `https://router.project-osrm.org/route/v1/driving/` +
+                            `${origem.lng},${origem.lat};${destino.lng},${destino.lat}` +
+                            `?overview=full&geometries=geojson`;
+                const resp = await fetch(url);
+                const json = await resp.json();
+
+                if (json.code !== 'Ok' || !json.routes?.[0]) {
+                    showToast('Não foi possível traçar a rota. Verifique a conexão.');
+                    return;
+                }
+
+                const route = json.routes[0];
+                const distKm = route.distance / 1000;
+                const durHrs = route.duration / 3600;
+
+                // Desenha rota
+                routeLayer = L.geoJSON(route.geometry, {
+                    style: { color: '#009639', weight: 5, opacity: 0.8, lineCap: 'round' }
+                }).addTo(map);
+
+                map.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
+
+                // Pins personalizados de Origem (Verde) e Destino (Vermelho) com animação pulsante
+                const pinOrigemHtml = `
+                    <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;">
+                        <div style="position: absolute; width: 36px; height: 36px; background: rgba(0, 150, 57, 0.25); border-radius: 50%; animation: pulse 2s infinite;"></div>
+                        <div style="position: relative; width: 22px; height: 22px; background: #009639; border: 3px solid #FFF; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 10px; color: #FFF; font-weight: 800; font-family: 'Outfit', sans-serif; line-height: 1;">O</span>
+                        </div>
+                    </div>
+                `;
+                
+                const pinDestinoHtml = `
+                    <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;">
+                        <div style="position: absolute; width: 36px; height: 36px; background: rgba(227, 27, 35, 0.25); border-radius: 50%; animation: pulse 2s infinite;"></div>
+                        <div style="position: relative; width: 22px; height: 22px; background: #E31B23; border: 3px solid #FFF; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 10px; color: #FFF; font-weight: 800; font-family: 'Outfit', sans-serif; line-height: 1;">D</span>
+                        </div>
+                    </div>
+                `;
+
+                const mkO = L.marker([origem.lat, origem.lng], {
+                    icon: L.divIcon({
+                        html: pinOrigemHtml,
+                        className: '', iconSize: [36,36], iconAnchor: [18,18]
+                    })
+                }).addTo(map).bindPopup(`<strong>Origem</strong><br>${origem.nome}`).openPopup();
+                
+                const mkD = L.marker([destino.lat, destino.lng], {
+                    icon: L.divIcon({
+                        html: pinDestinoHtml,
+                        className: '', iconSize: [36,36], iconAnchor: [18,18]
+                    })
+                }).addTo(map).bindPopup(`<strong>Destino</strong><br>${destino.nome}`);
+                
+                markers.push(mkO, mkD);
+
+                // Distâncias cumulativas ao longo da rota
+                const coords = route.geometry.coordinates;
+                const cumDists = [0];
+                for (let i = 1; i < coords.length; i++) {
+                    cumDists.push(cumDists[i-1] + haversineKm(
+                        coords[i-1][1], coords[i-1][0], coords[i][1], coords[i][0]
+                    ));
+                }
+
+                // Mapeia postos na rota (< 15 km)
+                const postosRota = [];
+                dataPostos.forEach(p => {
+                    const m = mapPostoToRoute(p, coords, cumDists);
+                    if (m.distAoTrajeto < 15) {
+                        postosRota.push({ ...p, kmNaRota: m.kmNaRota, distTrajeto: m.distAoTrajeto });
+                    }
+                });
+                postosRota.sort((a, b) => a.kmNaRota - b.kmNaRota);
+
+                // ===== ALGORITMO DE PARADAS (Reserva 25%) =====
+                const reservaL = tanque * 0.25;
+                const litrosIniciais = tanque * nivel;
+                let autonomiaRestante = litrosIniciais * consumo;
+                const reservaKm = reservaL * consumo;
+                let kmViajada = 0;
+                const paradas = [];
+                let semPosto = false;
+
+                while ((distKm - kmViajada) > (autonomiaRestante - reservaKm)) {
+                    const kmLimite = kmViajada + (autonomiaRestante - reservaKm);
+
+                    // Procura o posto mais distante dentro do limite seguro
+                    let melhor = null;
+                    for (let i = postosRota.length - 1; i >= 0; i--) {
+                        const p = postosRota[i];
+                        if (p.kmNaRota > kmViajada + 5 && p.kmNaRota <= kmLimite) {
+                            melhor = p;
+                            break;
+                        }
+                    }
+
+                    // Fallback: primeiro posto à frente
+                    if (!melhor) {
+                        melhor = postosRota.find(p => p.kmNaRota > kmViajada + 5);
+                    }
+
+                    if (!melhor || melhor.kmNaRota <= kmViajada) {
+                        semPosto = true;
+                        break;
+                    }
+
+                    paradas.push(melhor);
+                    kmViajada = melhor.kmNaRota;
+                    autonomiaRestante = tanque * consumo; // reabastece completo
+                }
+
+                // ===== RENDERIZAR MARCADORES NO MAPA =====
+                // Paradas obrigatórias (vermelho numerado)
+                paradas.forEach((p, i) => {
+                    const mk = L.marker([p.lat, p.lng], {
+                        icon: L.divIcon({
+                            html: `<div style="
+                                background:var(--if-vermelho,#E31B23);border:2.5px solid #FFF;color:#FFF;
+                                width:28px;height:28px;border-radius:50%;display:flex;
+                                align-items:center;justify-content:center;
+                                font-size:0.82rem;font-weight:800;font-family:'Outfit',sans-serif;
+                                box-shadow:0 3px 10px rgba(0,0,0,0.3);">${i+1}</div>`,
+                            className: '', iconSize: [28,28], iconAnchor: [14,14]
+                        })
+                    }).addTo(map).bindPopup(() => {
+                        const gpsHtml = obterBotoesGpsPopup(p);
+                        return `<strong>Parada ${i+1}</strong><br>${p.nome}<br>Km ${p.kmNaRota.toFixed(0)} da viagem${gpsHtml}`;
+                    });
+                    markers.push(mk);
+                });
+
+                // Outros postos na rota (verde)
+                postosRota.forEach(p => {
+                    if (paradas.includes(p)) return;
+                    const mk = L.marker([p.lat, p.lng], {
+                        icon: L.divIcon({
+                            html: `<div style="
+                                background:var(--if-verde,#009639);border:2px solid #FFF;
+                                width:20px;height:20px;border-radius:50%;display:flex;
+                                align-items:center;justify-content:center;font-size:0.7rem;
+                                box-shadow:0 2px 6px rgba(0,0,0,0.2);">⛽</div>`,
+                            className: '', iconSize: [20,20], iconAnchor: [10,10]
+                        })
+                    }).addTo(map).bindPopup(() => {
+                        const gpsHtml = obterBotoesGpsPopup(p);
+                        return `<strong>${p.nome}</strong><br>Opção alternativa · Km ${p.kmNaRota.toFixed(0)}${gpsHtml}`;
+                    });
+                    markers.push(mk);
+                });
+
+                // ===== RENDERIZAR PAINEL =====
+                document.getElementById('stat-dist').textContent = `${distKm.toFixed(0)} km`;
+
+                const h = Math.floor(durHrs);
+                const m = Math.round((durHrs - h) * 60);
+                document.getElementById('stat-time').textContent = `${h}h ${m}min`;
+
+                const totalL = distKm / consumo;
+                document.getElementById('stat-fuel').textContent = `${totalL.toFixed(1)} L`;
+
+                document.getElementById('stat-stops').textContent =
+                    paradas.length === 0 ? 'Nenhuma' : `${paradas.length}`;
+
+                // Gauge
+                const autUtil = Math.max(0, (litrosIniciais - reservaL) * consumo);
+                const pctGauge = Math.min(100, (autUtil / distKm) * 100);
+                const gaugeEl = document.getElementById('gauge-fill');
+                gaugeEl.style.width = pctGauge + '%';
+                gaugeEl.className = 'fuel-gauge-fill' +
+                    (pctGauge < 30 ? ' critical' : pctGauge < 60 ? ' low' : '');
+                document.getElementById('gauge-km').textContent = `${autUtil.toFixed(0)} km`;
+
+                // Alerta
+                const alertEl = document.getElementById('alert-box');
+                alertEl.className = 'alert-box visible';
+                if (semPosto) {
+                    alertEl.classList.add('alert-danger');
+                    alertEl.innerHTML = `⚠️ <strong>Cobertura insuficiente:</strong> Não há postos Goldi Fleet para cobrir o trajeto com reserva de 1/4. Planeje paradas em redes alternativas.`;
+                } else if (paradas.length > 0) {
+                    alertEl.classList.add('alert-warn');
+                    alertEl.innerHTML = `⛽ <strong>Atenção:</strong> ${paradas.length} parada(s) obrigatória(s) para manter a reserva de segurança de 25%.`;
+                } else {
+                    alertEl.classList.add('alert-ok');
+                    alertEl.innerHTML = `✅ <strong>Viagem segura:</strong> Autonomia suficiente para completar o trajeto com reserva de 1/4 mantida.`;
+                }
+
+                // Links GPS
+                document.getElementById('link-google').href =
+                    `https://www.google.com/maps/dir/?api=1&origin=${origem.lat},${origem.lng}&destination=${destino.lat},${destino.lng}&travelmode=driving`;
+                document.getElementById('link-waze').href =
+                    `https://waze.com/ul?ll=${destino.lat},${destino.lng}&navigate=yes`;
+
+                // Lista de Postos (Agrupa e ordena por quilometragem na rota)
+                const listEl = document.getElementById('postos-list');
+                listEl.innerHTML = '';
+
+                const todosPostos = [];
+                paradas.forEach((p, i) => {
+                    todosPostos.push({ ...p, obrigatorio: true, indexParada: i + 1 });
+                });
+                postosRota.forEach(p => {
+                    if (paradas.includes(p)) return;
+                    todosPostos.push({ ...p, obrigatorio: false });
+                });
+
+                todosPostos.sort((a, b) => a.kmNaRota - b.kmNaRota);
+
+                if (todosPostos.length === 0) {
+                    listEl.innerHTML = `
+                        <div class="empty-state">
+                            <span class="empty-icon">🛣️</span>
+                            Nenhum posto credenciado localizado no trajeto desta rota.
+                        </div>`;
+                } else {
+                    todosPostos.forEach(p => {
+                        const el = document.createElement('div');
+                        el.className = 'posto-item' + (p.obrigatorio ? ' posto-obrigatorio' : '');
+                        
+                        const badgeHtml = p.obrigatorio ? 
+                            `<span class="stop-badge">Parada #${p.indexParada}</span>` :
+                            `<span class="stop-badge alternative">Alternativa</span>`;
+                            
+                        const links = obterLinksGPSPosto(p);
+
+                        el.innerHTML = `
+                            ${badgeHtml}
+                            <h4>${p.nome}</h4>
+                            <div class="posto-meta">${p.rodovia} · Km ${p.kmNaRota.toFixed(0)} da viagem</div>
+                            <div class="posto-item-actions">
+                                <a href="${links.googleUrl}" target="_blank" rel="noopener" class="btn-gps btn-gps-google">
+                                    🗺️ Maps
+                                </a>
+                                <a href="${links.wazeUrl}" target="_blank" rel="noopener" class="btn-gps btn-gps-waze">
+                                    🧭 Waze
+                                </a>
+                                <a href="${links.appleUrl}" target="_blank" rel="noopener" class="btn-gps btn-gps-apple">
+                                    🍎 Apple
+                                </a>
+                            </div>
+                        `;
+                        listEl.appendChild(el);
+                    });
+                }
+
+                // Exibe painéis
+                document.getElementById('card-results').classList.add('visible');
+                document.getElementById('card-postos').classList.add('visible');
+
+                // No mobile, troca a tab para Resumo
+                if (window.innerWidth <= 900) {
+                    document.querySelector('.mobile-tab[data-tab="results"]').click();
+                    sidebar.classList.add('expanded');
+                }
+
+            } catch (err) {
+                console.error('Erro na roteirização:', err);
+                showToast('Erro ao calcular rota. Verifique a conexão.');
+            } finally {
+                btnSubmit.classList.remove('loading');
+                btnSubmit.disabled = false;
+            }
+        }
+
+        // ===================== TOAST DE ERRO =====================
+        function showToast(msg) {
+            let toast = document.getElementById('toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'toast';
+                toast.setAttribute('role', 'alert');
+                toast.setAttribute('aria-live', 'assertive');
+                Object.assign(toast.style, {
+                    position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+                    background: 'var(--verde-escuro)', color: '#FFF', padding: '12px 24px',
+                    borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: '9999',
+                    opacity: '0', transition: 'opacity 0.3s'
+                });
+                document.body.appendChild(toast);
+            }
+            toast.textContent = msg;
+            toast.style.opacity = '1';
+            setTimeout(() => { toast.style.opacity = '0'; }, 3500);
+        }
+
+        // ===================== INICIALIZAÇÃO =====================
+        function iniciarAplicacao() {
+            initMap();
+            loadData();
+            document.getElementById('routeForm').addEventListener('submit', calcularRota);
+
+            // Toggle Sidebar (Colapsar / Deslizar)
+            const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+            const sidebarEl = document.getElementById('sidebar');
+            btnToggleSidebar.addEventListener('click', () => {
+                const isCollapsed = sidebarEl.classList.toggle('collapsed');
+                btnToggleSidebar.setAttribute('aria-label', isCollapsed ? 'Expandir painel lateral' : 'Recolher painel lateral');
+                
+                // Recalcula o tamanho do mapa Leaflet após a animação de transição
+                setTimeout(() => {
+                    if (map) {
+                        map.invalidateSize();
+                    }
+                }, 360);
+            });
+
+            // Controle Interativo de Combustível (Dial Semicircular)
+            const inputNivel = document.getElementById('nivel-combustivel');
+            const dialSvg = document.getElementById('interactive-dial-svg');
+            const needle = document.getElementById('dial-needle');
+            const dialLabels = document.getElementById('dial-labels');
+            const dialStatus = document.getElementById('dial-status-text');
+            const formBtnSubmit = document.getElementById('btnSubmit');
+
+            function updateDial(valor) {
+                // valor varia de 0.0 a 1.0 (decrescente: esquerda=1.0, direita=0.0)
+                inputNivel.value = valor;
+                
+                // Rotaciona a agulha de -90deg (1.0 - Cheio na esquerda) a 90deg (0.0 - Reserva na direita)
+                const degrees = ((1.0 - valor) * 180) - 90;
+                needle.style.transform = `rotate(${degrees}deg)`;
+                
+                // Atualiza botões de escala
+                dialLabels.querySelectorAll('.dial-label-btn').forEach(btn => {
+                    const btnVal = parseFloat(btn.dataset.value);
+                    if (Math.abs(btnVal - valor) < 0.01) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+                
+                // Atualiza texto informativo e validações
+                dialStatus.className = 'dial-status-text';
+                formBtnSubmit.disabled = false;
+                
+                if (valor === 0.0) {
+                    dialStatus.textContent = 'Nível: 0% (Reserva Crítica!)';
+                    dialStatus.classList.add('warning');
+                    formBtnSubmit.disabled = true; // Desabilita o botão de enviar
+                    showToast('Abastecer antes da viagem é obrigatório!');
+                } else if (valor <= 0.2) {
+                    dialStatus.textContent = `Nível: ${(valor * 100).toFixed(0)}% (Reserva)`;
+                    dialStatus.classList.add('warning');
+                } else if (valor === 0.5) {
+                    dialStatus.textContent = 'Nível: 50% (Metade do Tanque)';
+                } else if (valor === 1.0) {
+                    dialStatus.textContent = 'Nível: 100% (Tanque Cheio)';
+                } else {
+                    dialStatus.textContent = `Nível: ${(valor * 100).toFixed(0)}% do Tanque`;
+                }
+            }
+
+            // Ouvinte para clique nos botões de texto da escala
+            dialLabels.addEventListener('click', (e) => {
+                const btn = e.target.closest('.dial-label-btn');
+                if (btn) {
+                    const val = parseFloat(btn.dataset.value);
+                    updateDial(val);
+                }
+            });
+
+            // Ouvinte para clique diretamente no arco do dial SVG
+            dialSvg.addEventListener('click', (e) => {
+                const rect = dialSvg.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Mapeia coordenadas em relação ao viewbox (200x120)
+                const svgX = (x / rect.width) * 200;
+                const svgY = (y / rect.height) * 120;
+                
+                // O centro do dial é (100, 100)
+                const dx = svgX - 100;
+                const dy = svgY - 100;
+                
+                // Calcula o ângulo em radianos
+                const theta = Math.atan2(dy, dx);
+                let angleDeg = theta * 180 / Math.PI;
+                
+                // Clamping do ângulo para a parte superior do semicírculo
+                if (svgY > 100) {
+                    angleDeg = dx < 0 ? -180 : 0;
+                }
+                
+                // Converte o ângulo em porcentagem decrescente (esquerda=1.0, direita=0.0)
+                const pct = 1.0 - ((angleDeg + 180) / 180);
+                
+                // Arredonda para o múltiplo de 10% mais próximo
+                const val = Math.round(pct * 10) / 10;
+                
+                updateDial(val);
+            });
+
+            // Inicializa o medidor interativo com tanque cheio (1.0)
+            updateDial(1.0);
+
+            // Função global de toggle vertical exposta no escopo do navegador
+            window.toggleSection = function(cardId) {
+                const cardEl = document.getElementById(cardId);
+                if (!cardEl) return;
+                
+                const isCollapsed = cardEl.classList.toggle('collapsed');
+                
+                const header = cardEl.querySelector('.section-header-toggle');
+                const content = cardEl.querySelector('.section-content');
+                const arrowBtn = cardEl.querySelector('.btn-slide-vertical');
+                
+                if (header && content) {
+                    header.setAttribute('aria-expanded', !isCollapsed);
+                    content.setAttribute('aria-hidden', isCollapsed);
+                }
+                if (arrowBtn) {
+                    arrowBtn.setAttribute('aria-label', isCollapsed ? 'Expandir seção' : 'Recolher seção');
+                }
+                
+                // Redimensiona mapa Leaflet caso layouts mudem na sidebar
+                setTimeout(() => {
+                    if (map) {
+                        map.invalidateSize();
+                    }
+                }, 360);
+            };
+
+            // Redimensiona mapa quando a janela muda de tamanho
+            window.addEventListener('resize', () => { if (map) map.invalidateSize(); });
+        }
+
+        // Executa imediatamente se o DOM já estiver pronto, caso contrário espera DOMContentLoaded
+        if (document.readyState === 'loading') {
+            window.addEventListener('DOMContentLoaded', iniciarAplicacao);
+        } else {
+            iniciarAplicacao();
+        }
+
+    })();
+    </script>
+</body>
+</html>
