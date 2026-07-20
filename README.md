@@ -64,7 +64,7 @@ rota-frota/
 - **Aprimoramento de Responsividade Mobile**:
   - Exposição das tabs (ajustado para 94px de altura útil exposta no bottom sheet recolhido) para acomodar a nova alça informativa.
   - Adicionado o botão e indicador de texto **"Clique aqui para expandir ▲"** (que se altera dinamicamente via JS para **"Clique aqui para recolher ▼"** quando aberto) na alça de arrasto do painel mobile.
-  - Correção da visibilidade do mapa no celular, alterando o contêiner principal `.app-body` para `display: block` e resetando a largura do `.sidebar` para `width: 100%; min-width: 0;`, o que impede que o mapa seja ocultado por regras flexbox ou esmagado pelo tamanho desktop de 420px.
+  - Correção da visibilidade do mapa no celular, configurando `.map-panel` com posicionamento absoluto (`top: 0; bottom: 0; left: 0; right: 0; z-index: 1`) e desativando as restrições de `max-height` herdadas do desktop, garantindo que o Leaflet renderize o mapa preenchendo 100% da viewport sob a sidebar flutuante.
   - Bloqueio de rolagem (`overflow: hidden`) no bottom sheet recolhido para evitar conflitos de gestos de toque no celular.
   - Empilhamento vertical dos botões de GPS (`.nav-actions`) para criar alvos de toque maiores e mais acessíveis no mobile.
   - Ocultação inteligente de textos de cabeçalho (`Roteirizador de Frota` e botão `Contraste`) em telas estreitas, priorizando a logo oficial do IF Baiano sem quebra de layout.

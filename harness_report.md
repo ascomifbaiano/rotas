@@ -1,7 +1,7 @@
 # 🧪 Relatório de Diagnóstico & Integridade - Rota Frota IF Baiano
 
-- **Data da Varredura**: `20/07/2026 14:09:11`
-- **Tempo de Processamento**: `34.62 ms``
+- **Data da Varredura**: `20/07/2026 14:19:34`
+- **Tempo de Processamento**: `33.69 ms``
 
 ## 📊 Tabela de Status dos Sensores
 
