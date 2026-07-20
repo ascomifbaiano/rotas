@@ -1130,8 +1130,7 @@
             }
 
             .app-body {
-                grid-template-columns: 1fr;
-                grid-template-rows: 1fr;
+                display: block; /* Garante que o container aja como bloco e não encolha o mapa no flexbox */
                 height: calc(100vh - 56px);
                 height: calc(100dvh - 56px);
                 position: relative;
@@ -1149,6 +1148,8 @@
                 bottom: 0;
                 left: 0;
                 right: 0;
+                width: 100%; /* Força largura total no mobile */
+                min-width: 0; /* Sobrescreve min-width do desktop */
                 z-index: 900;
                 max-height: 75vh;
                 max-height: 75dvh;
@@ -1157,7 +1158,7 @@
                 border-radius: 16px 16px 0 0;
                 box-shadow: 0 -8px 30px rgba(9,40,18,0.15);
                 padding: 12px 16px 24px;
-                transform: translateY(calc(100% - 80px)); /* Expor perfeitamente a alça (22px) + tabs (38px) + margem = ~80px */
+                transform: translateY(calc(100% - 94px)); /* Expor perfeitamente a alça/texto (36px) + tabs (38px) + margem = ~94px */
                 transition: transform 0.4s var(--ease-out-expo);
                 will-change: transform;
                 background-color: var(--if-card);
@@ -1172,8 +1173,9 @@
             /* Alça de arrastar */
             .sheet-handle {
                 display: flex;
-                justify-content: center;
-                padding: 6px 0 12px;
+                flex-direction: column;
+                align-items: center;
+                padding: 6px 0 10px;
                 cursor: pointer;
             }
 
@@ -1182,6 +1184,20 @@
                 height: 4px;
                 background: var(--if-borda);
                 border-radius: 4px;
+            }
+
+            .sheet-handle-text {
+                font-size: 0.65rem;
+                font-weight: 700;
+                color: var(--if-texto-mutado);
+                margin-top: 5px;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                transition: color 0.2s;
+            }
+
+            .sheet-handle:hover .sheet-handle-text {
+                color: var(--if-verde);
             }
 
             .mobile-tabs {
@@ -1335,6 +1351,7 @@
             <!-- Alça mobile -->
             <div class="sheet-handle" id="sheetHandle" aria-label="Arrastar painel">
                 <div class="sheet-handle-bar"></div>
+                <span class="sheet-handle-text">Clique aqui para expandir ▲</span>
             </div>
 
             <!-- Tabs mobile -->
@@ -1613,9 +1630,13 @@
         // ===================== MOBILE: BOTTOM SHEET =====================
         const sidebar = document.getElementById('sidebar');
         const sheetHandle = document.getElementById('sheetHandle');
+        const handleText = sheetHandle.querySelector('.sheet-handle-text');
 
         sheetHandle.addEventListener('click', () => {
-            sidebar.classList.toggle('expanded');
+            const isExpanded = sidebar.classList.toggle('expanded');
+            if (handleText) {
+                handleText.textContent = isExpanded ? 'Clique aqui para recolher ▼' : 'Clique aqui para expandir ▲';
+            }
         });
 
         // Tabs

@@ -62,10 +62,12 @@ rota-frota/
 - **Sincronização de Banco de Dados**: Atualizados os arquivos `postos.json` e a base interna (`dadosLocaisDefault`) no `index.html`.
 - **Ajuste de Seleção Padrão**: Modificado o carregador dinâmico do dropdown para usar 'Campus Senhor do Bonfim' como destino pré-selecionado de fallback.
 - **Aprimoramento de Responsividade Mobile**:
-  - Exposição das tabs (80px de altura útil exposta no bottom sheet recolhido) para que os botões de navegação lateral fiquem sempre visíveis e fáceis de alternar.
+  - Exposição das tabs (ajustado para 94px de altura útil exposta no bottom sheet recolhido) para acomodar a nova alça informativa.
+  - Adicionado o botão e indicador de texto **"Clique aqui para expandir ▲"** (que se altera dinamicamente via JS para **"Clique aqui para recolher ▼"** quando aberto) na alça de arrasto do painel mobile.
+  - Correção da visibilidade do mapa no celular, alterando o contêiner principal `.app-body` para `display: block` e resetando a largura do `.sidebar` para `width: 100%; min-width: 0;`, o que impede que o mapa seja ocultado por regras flexbox ou esmagado pelo tamanho desktop de 420px.
   - Bloqueio de rolagem (`overflow: hidden`) no bottom sheet recolhido para evitar conflitos de gestos de toque no celular.
   - Empilhamento vertical dos botões de GPS (`.nav-actions`) para criar alvos de toque maiores e mais acessíveis no mobile.
-  - Ocultação inteligente de textos de cabeçalho (`Roteirizador de Frota` e botão `Contraste`) em telas estreitas, priorizando a exibição da logo oficial do IF Baiano sem quebra de layout.
+  - Ocultação inteligente de textos de cabeçalho (`Roteirizador de Frota` e botão `Contraste`) em telas estreitas, priorizando a logo oficial do IF Baiano sem quebra de layout.
   - Redesenho dos botões seletores do tanque (dial de combustível) como chips/botões arredondados e confortáveis para navegação por toque sob o mostrador SVG.
 
 ### [2.3.0] — 19/07/2026
