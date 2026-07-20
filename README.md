@@ -55,12 +55,18 @@ rota-frota/
 
 ### [2.4.0] — 20/07/2026
 
-**Atualização das Unidades do IF Baiano:**
+**Atualização e Otimização Responsiva (IF Baiano):**
 - **Remoção de Unidades Inválidas**: Expurgadas as unidades/campi que não pertencem ao IF Baiano (como Candeias, Feira de Santana e destinos de suporte do IFBA).
 - **Correção e Padronização de Endereços**: Atualizados os nomes (ex: "Catu" sem acento) e coordenadas geográficas (lat/lng) de todas as 14 unidades existentes e da Reitoria para máxima precisão de rotas.
 - **Novas Unidades do Processo de Expansão**: Cadastradas as novas unidades em implantação de **Santo Estêvão**, **Remanso**, **Ruy Barbosa** e **Ribeira do Pombal** com coordenadas aproximadas das sedes municipais correspondentes.
 - **Sincronização de Banco de Dados**: Atualizados os arquivos `postos.json` e a base interna (`dadosLocaisDefault`) no `index.html`.
 - **Ajuste de Seleção Padrão**: Modificado o carregador dinâmico do dropdown para usar 'Campus Senhor do Bonfim' como destino pré-selecionado de fallback.
+- **Aprimoramento de Responsividade Mobile**:
+  - Exposição das tabs (80px de altura útil exposta no bottom sheet recolhido) para que os botões de navegação lateral fiquem sempre visíveis e fáceis de alternar.
+  - Bloqueio de rolagem (`overflow: hidden`) no bottom sheet recolhido para evitar conflitos de gestos de toque no celular.
+  - Empilhamento vertical dos botões de GPS (`.nav-actions`) para criar alvos de toque maiores e mais acessíveis no mobile.
+  - Ocultação inteligente de textos de cabeçalho (`Roteirizador de Frota` e botão `Contraste`) em telas estreitas, priorizando a exibição da logo oficial do IF Baiano sem quebra de layout.
+  - Redesenho dos botões seletores do tanque (dial de combustível) como chips/botões arredondados e confortáveis para navegação por toque sob o mostrador SVG.
 
 ### [2.3.0] — 19/07/2026
 
